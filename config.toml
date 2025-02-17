@@ -1,0 +1,52 @@
+[upgrades]
+# Format: [cost, defense_value]
+warrior = { cost = 15, defense = 2, name = "Воин", defense_per_second = 0 }
+archer = { cost = 25, defense = 5, name = "Лучник", defense_per_second = 0 }
+catapult = { cost = 50, defense = 8, name = "Катапульта", defense_per_second = 0 }
+officer = { cost = 100, defense = 5, name = "Офицер", defense_per_second = 2 }
+oil = { cost = 150, defense = 15, name = "Кипящее масло", defense_per_second = 0 }
+
+[trade_hall]
+base_cost = 200
+base_gold_per_second = 5
+name = "Торговая палата"
+levels = [
+    { cost_multiplier = 1.0, gold_multiplier = 1.0 },
+    { cost_multiplier = 1.5, gold_multiplier = 1.5 },
+    { cost_multiplier = 2.0, gold_multiplier = 2.25 },
+    { cost_multiplier = 3.0, gold_multiplier = 3.5 },
+    { cost_multiplier = 4.0, gold_multiplier = 5.0 },
+]
+
+[midas_hand]
+required_trade_hall_level = 5
+base_cost = 500
+cooldown_reduction = 0.1
+max_level = 10
+name = "Рука Мидаса"
+levels = [
+    { cost_multiplier = 1.0 },
+    { cost_multiplier = 1.2 },
+    { cost_multiplier = 1.5 },
+    { cost_multiplier = 2.0 },
+    { cost_multiplier = 2.5 },
+    { cost_multiplier = 3.0 },
+    { cost_multiplier = 4.0 },
+    { cost_multiplier = 5.0 },
+    { cost_multiplier = 7.0 },
+    { cost_multiplier = 10.0 },
+]
+
+[click]
+base_cooldown = 1.5
+
+[events]
+# Format: [min_damage, max_damage, message]
+bandit_raid = { min_damage = 5, max_damage = 15, message = "Банда разбойников атакует замок!" }
+siege_catapults = { min_damage = 15, max_damage = 30, message = "Вражеские катапульты обстреливают стены!" }
+sabotage = { min_damage = 5, max_damage = 100, message = "Враги подослали диверсантов!" }
+cooldown = 1.5
+
+[trade]
+# Format: [min_gain, max_gain, message]
+offer = { min_gain = 20, max_gain = 50, message = "Прибыл торговый караван!" }
