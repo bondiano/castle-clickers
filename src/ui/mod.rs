@@ -1,4 +1,5 @@
 pub mod events;
+pub mod game_over;
 pub mod stats;
 pub mod upgrades;
 
@@ -19,4 +20,9 @@ pub fn create_layout(area: Rect) -> (Rect, Rect) {
         .split(chunks[1]);
 
     (chunks[0], main_chunks[0])
+}
+
+pub fn create_game_over_layout(area: Rect) -> Rect {
+    // Use the entire screen for the game over message
+    area
 }

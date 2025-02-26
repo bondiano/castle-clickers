@@ -7,35 +7,34 @@ use crate::{
     game::{self, Config},
 };
 
-pub fn update_defense_by_per_second_system(
-    mut query: Query<(&Upgrades, &mut Defense, &mut LastTick, &Config)>,
-) {
-    for (upgrades, mut defense, mut last_tick, config) in query.iter_mut() {
-        let now = Instant::now();
-        let elapsed = now.duration_since(last_tick.0);
-
-        if elapsed >= Duration::from_secs(1) {
-            defense.0 += game::calculate_defense_per_second(upgrades, config);
-            last_tick.0 = now;
-        }
-    }
-}
-
-pub fn update_gold_system(
+pub fn update_per_second_system(
     mut query: Query<(
         &mut Gold,
         &mut GoldPerSecond,
+        &mut Defense,
+        &mut DefensePerSecond,
         &mut LastTick,
-        &Upgrades,
+        &BoughtUpgrades,
         &Config,
     )>,
 ) {
-    for (mut gold, mut gold_ps, mut last_tick, upgrades, config) in query.iter_mut() {
+    for (
+        mut gold,
+        mut gold_ps,
+        mut defense,
+        mut defense_ps,
+        mut last_tick,
+        bought_upgrades,
+        config,
+    ) in query.iter_mut()
+    {
         let now = Instant::now();
         let elapsed = now.duration_since(last_tick.0);
 
         if elapsed >= Duration::from_secs(1) {
-            gold_ps.0 = game::calculate_gold_per_second(upgrades, config);
+            defense.0 += game::calculate_defense_per_second(bought_upgrades, config);
+            defense_ps.0 = game::calculate_defense_per_second(bought_upgrades, config);
+            gold_ps.0 = game::calculate_gold_per_second(bought_upgrades, config);
             gold.0 += gold_ps.0;
             last_tick.0 = now;
         }
@@ -49,6 +48,7 @@ pub fn handle_events_system(
         &mut LastEventCheck,
         &mut EventMessage,
         &mut GameRunning,
+        &mut GameState,
         &Config,
     )>,
 ) {
@@ -58,6 +58,7 @@ pub fn handle_events_system(
         mut last_event_check,
         mut event_message,
         mut game_running,
+        mut game_state,
         config,
     ) in query.iter_mut()
     {
@@ -99,6 +100,7 @@ pub fn handle_events_system(
                         event_message.message =
                             t!("game.events.castle_fall", message = message).to_string();
                         game_running.0 = false;
+                        *game_state = GameState::GameOver;
                     }
                 }
                 game::GameEvent::TradeOffer { gold_gain, message } => {
@@ -124,20 +126,22 @@ pub fn handle_upgrade_system(
     mut query: Query<(
         &mut Gold,
         &mut Defense,
-        &mut Upgrades,
+        &mut BoughtUpgrades,
+        &Upgrades,
         &SelectedUpgrade,
         &Config,
     )>,
 ) {
-    for (mut gold, mut defense, mut upgrades, selected, config) in query.iter_mut() {
-        let cost = selected.0.cost(config);
+    for (mut gold, mut defense, mut bought_upgrades, upgrades, selected, config) in query.iter_mut()
+    {
+        let cost = selected.0.cost(config, &bought_upgrades);
 
         if !game::can_afford_upgrade(gold.0, cost) {
             continue;
         }
 
         gold.0 -= cost;
-        upgrades.increment(&selected.0);
+        bought_upgrades.increment(&selected.0);
         upgrades.apply_defense(&mut defense, &config);
     }
 }

@@ -10,7 +10,6 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{prelude::*, Terminal};
-use rust_i18n::t;
 use std::{io, time::Instant};
 
 use crate::components::AvailableUpgrades;
@@ -31,6 +30,8 @@ struct GameBundle {
     event_message: components::EventMessage,
     selected_upgrade: components::SelectedUpgrade,
     game_running: components::GameRunning,
+    game_state: components::GameState,
+    bought_upgrades: components::BoughtUpgrades,
     config: game::Config,
 }
 
@@ -46,26 +47,27 @@ fn main() -> io::Result<()> {
     let (mut schedule, mut upgrade_schedule) = setup_schedules();
 
     // Game loop
-    while world.query::<&components::GameRunning>().single(&world).0 {
-        schedule.run(&mut world);
-        render_game(&mut terminal, &mut world)?;
-        input::handle_input(&mut world, &mut upgrade_schedule)?;
+    loop {
+        let game_state = world.query::<&components::GameState>().single(&world);
+
+        match *game_state {
+            components::GameState::Playing => {
+                schedule.run(&mut world);
+                render_game(&mut terminal, &mut world)?;
+                input::handle_input(&mut world, &mut upgrade_schedule)?;
+            }
+            components::GameState::GameOver => {
+                render_game_over(&mut terminal, &mut world)?;
+                input::handle_game_over_input(&mut world)?;
+            }
+            components::GameState::Exiting => {
+                break;
+            }
+        }
     }
 
     disable_raw_mode()?;
     io::stdout().execute(LeaveAlternateScreen)?;
-
-    let (defense, max_defense) = world
-        .query::<(&components::Defense, &components::MaxDefense)>()
-        .single(&world);
-    println!(
-        "{}",
-        t!(
-            "game.game_over",
-            defense = defense.0,
-            max_defense = max_defense.0
-        )
-    );
 
     Ok(())
 }
@@ -74,7 +76,7 @@ fn setup_world(config: game::Config) -> World {
     let mut world = World::new();
 
     world.spawn(GameBundle {
-        gold: components::Gold(100),
+        gold: components::Gold(200),
         gold_ps: components::GoldPerSecond(0),
         defense: components::Defense(100),
         max_defense: components::MaxDefense(100),
@@ -87,8 +89,10 @@ fn setup_world(config: game::Config) -> World {
             timestamp: Instant::now(),
         },
         selected_upgrade: components::SelectedUpgrade(AvailableUpgrades::Catapult),
+        bought_upgrades: components::BoughtUpgrades::default(),
         upgrades: components::Upgrades::default(),
         game_running: components::GameRunning(true),
+        game_state: components::GameState::default(),
         config,
     });
 
@@ -99,9 +103,8 @@ fn setup_schedules() -> (Schedule, Schedule) {
     let mut schedule = Schedule::default();
     schedule.add_systems(
         (
-            systems::update_gold_system,
+            systems::update_per_second_system,
             systems::handle_events_system,
-            systems::update_defense_by_per_second_system,
         )
             .chain(),
     );
@@ -124,6 +127,7 @@ fn render_game(terminal: &mut Terminal<impl Backend>, world: &mut World) -> io::
         &components::EventMessage,
         &components::LastClick,
         &components::LastEventCheck,
+        &components::BoughtUpgrades,
     )>();
     let entity = query.get_single(world).unwrap();
 
@@ -148,9 +152,10 @@ fn render_game(terminal: &mut Terminal<impl Backend>, world: &mut World) -> io::
                 event,
                 last_click,
                 last_event_check,
+                bought_upgrades,
             ) = entity;
 
-            let midas_level = upgrades.get_count(&AvailableUpgrades::MidasHand(0));
+            let midas_level = bought_upgrades.get_count(&AvailableUpgrades::MidasHand);
             let click_cooldown = game::calculate_click_cooldown(midas_level, config);
             let next_event_cooldown =
                 game::calculate_next_event_cooldown(last_event_check.0, config);
@@ -165,8 +170,27 @@ fn render_game(terminal: &mut Terminal<impl Backend>, world: &mut World) -> io::
                 click_cooldown,
                 next_event_cooldown,
             );
-            ui::upgrades::render_upgrades(&mut frame, upgrades_area, upgrades, selected, config);
+            ui::upgrades::render_upgrades(
+                &mut frame,
+                upgrades_area,
+                upgrades,
+                selected,
+                bought_upgrades,
+                config,
+            );
             ui::events::render_event(&mut frame, event_area, event);
+        })
+        .map(|_| ())
+}
+
+fn render_game_over(terminal: &mut Terminal<impl Backend>, world: &mut World) -> io::Result<()> {
+    let mut query = world.query::<(&components::Defense, &components::MaxDefense)>();
+    let (defense, max_defense) = query.single_mut(world);
+
+    terminal
+        .draw(|mut frame| {
+            let area = ui::create_game_over_layout(frame.area());
+            ui::game_over::render_game_over(&mut frame, area, defense, max_defense);
         })
         .map(|_| ())
 }

@@ -38,15 +38,13 @@ levels = [
 ]
 
 [click]
-base_cooldown = 1.5
+base_cooldown = 1.2
 
 [events]
-# Format: [min_damage, max_damage, message]
-bandit_raid = { min_damage = 5, max_damage = 15, message = "Банда разбойников атакует замок!" }
-siege_catapults = { min_damage = 15, max_damage = 30, message = "Вражеские катапульты обстреливают стены!" }
-sabotage = { min_damage = 5, max_damage = 100, message = "Враги подослали диверсантов!" }
-cooldown = 1.5
+bandit_raid = { min_damage = 5, max_damage = 15, probability = 0.15, message = "Банда разбойников атакует замок!" }
+siege_catapults = { min_damage = 15, max_damage = 30, probability = 0.1, message = "Вражеские катапульты обстреливают стены!" }
+sabotage = { min_damage = 5, max_damage = 100, probability = 0.05, message = "Враги подослали диверсантов!" }
+cooldown = 2.5
 
 [trade]
-# Format: [min_gain, max_gain, message]
-offer = { min_gain = 20, max_gain = 50, message = "Прибыл торговый караван!" }
+offer = { min_gain = 20, max_gain = 50, probability = 0.1, message = "Прибыл торговый караван!" }

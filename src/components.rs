@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use std::time::Instant;
+use std::{collections::HashMap, ops::AddAssign, time::Instant};
 
 use crate::game::Config;
 
@@ -18,38 +18,42 @@ pub struct DefensePerSecond(pub u64);
 #[derive(Component)]
 pub struct MaxDefense(pub u64);
 
-#[derive(Component, PartialEq, Copy, Clone)]
+#[derive(Component, PartialEq, Copy, Clone, Eq, Hash)]
 pub enum AvailableUpgrades {
     Catapult,
     Archer,
     Warrior,
     Officer,
     OilReserve,
-    TradeHall(u32),
-    MidasHand(u32),
+    TradeHall,
+    MidasHand,
 }
 
 impl AvailableUpgrades {
-    pub fn cost(&self, config: &Config) -> u64 {
+    pub fn cost(&self, config: &Config, bought_upgrades: &BoughtUpgrades) -> u64 {
         match self {
             AvailableUpgrades::Catapult => config.upgrades.catapult.cost,
             AvailableUpgrades::Archer => config.upgrades.archer.cost,
             AvailableUpgrades::Warrior => config.upgrades.warrior.cost,
             AvailableUpgrades::Officer => config.upgrades.officer.cost,
             AvailableUpgrades::OilReserve => config.upgrades.oil.cost,
-            AvailableUpgrades::TradeHall(level) => {
-                let level_index = *level as usize;
-                if level_index >= config.trade_hall.levels.len() {
+            AvailableUpgrades::TradeHall => {
+                let level = bought_upgrades.get_count(self);
+                if level >= config.trade_hall.levels.len() as u32 {
                     return 0;
                 }
+
+                let level_index = level as usize;
                 (config.trade_hall.base_cost as f32
                     * config.trade_hall.levels[level_index].cost_multiplier) as u64
             }
-            AvailableUpgrades::MidasHand(level) => {
-                let level_index = *level as usize;
-                if level_index >= config.midas_hand.levels.len() {
+            AvailableUpgrades::MidasHand => {
+                let level = bought_upgrades.get_count(self);
+                if level >= config.midas_hand.levels.len() as u32 {
                     return 0;
                 }
+
+                let level_index = level as usize;
                 (config.midas_hand.base_cost as f32
                     * config.midas_hand.levels[level_index].cost_multiplier) as u64
             }
@@ -59,6 +63,25 @@ impl AvailableUpgrades {
 
 #[derive(Component)]
 pub struct SelectedUpgrade(pub AvailableUpgrades);
+
+#[derive(Component)]
+pub struct BoughtUpgrades(pub HashMap<AvailableUpgrades, u32>);
+
+impl Default for BoughtUpgrades {
+    fn default() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl BoughtUpgrades {
+    pub fn get_count(&self, upgrade: &AvailableUpgrades) -> u32 {
+        *self.0.get(upgrade).unwrap_or(&0)
+    }
+
+    pub fn increment(&mut self, upgrade: &AvailableUpgrades) {
+        self.0.entry(*upgrade).or_insert(0).add_assign(1);
+    }
+}
 
 #[derive(Component)]
 pub struct LastTick(pub Instant);
@@ -78,6 +101,19 @@ pub struct EventMessage {
 #[derive(Component)]
 pub struct GameRunning(pub bool);
 
+#[derive(Component, PartialEq, Eq, Clone, Copy)]
+pub enum GameState {
+    Playing,
+    GameOver,
+    Exiting,
+}
+
+impl Default for GameState {
+    fn default() -> Self {
+        Self::Playing
+    }
+}
+
 #[derive(Component)]
 pub struct Upgrades(pub [AvailableUpgrades; 7]);
 
@@ -89,53 +125,13 @@ impl Default for Upgrades {
             AvailableUpgrades::Warrior,
             AvailableUpgrades::Officer,
             AvailableUpgrades::OilReserve,
-            AvailableUpgrades::TradeHall(0),
-            AvailableUpgrades::MidasHand(0),
+            AvailableUpgrades::TradeHall,
+            AvailableUpgrades::MidasHand,
         ])
     }
 }
 
 impl Upgrades {
-    pub fn get_count(&self, upgrade: &AvailableUpgrades) -> u32 {
-        let index = self
-            .0
-            .iter()
-            .position(|u| match (u, upgrade) {
-                (AvailableUpgrades::TradeHall(_), AvailableUpgrades::TradeHall(_)) => true,
-                (AvailableUpgrades::MidasHand(_), AvailableUpgrades::MidasHand(_)) => true,
-                (a, b) => a == b,
-            })
-            .unwrap_or(0);
-
-        match self.0[index] {
-            AvailableUpgrades::TradeHall(level) => level,
-            AvailableUpgrades::MidasHand(level) => level,
-            _ => 0,
-        }
-    }
-
-    pub fn increment(&mut self, upgrade: &AvailableUpgrades) {
-        let index = self
-            .0
-            .iter()
-            .position(|u| match (u, upgrade) {
-                (AvailableUpgrades::TradeHall(_), AvailableUpgrades::TradeHall(_)) => true,
-                (AvailableUpgrades::MidasHand(_), AvailableUpgrades::MidasHand(_)) => true,
-                (a, b) => a == b,
-            })
-            .unwrap_or(0);
-
-        match self.0[index] {
-            AvailableUpgrades::TradeHall(level) => {
-                self.0[index] = AvailableUpgrades::TradeHall(level + 1);
-            }
-            AvailableUpgrades::MidasHand(level) => {
-                self.0[index] = AvailableUpgrades::MidasHand(level + 1);
-            }
-            _ => {}
-        }
-    }
-
     pub fn apply_defense(&self, defense: &mut Defense, config: &Config) {
         defense.0 += match self.0[0] {
             AvailableUpgrades::Catapult => config.upgrades.catapult.defense,

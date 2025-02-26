@@ -86,6 +86,7 @@ pub struct Events {
 pub struct EventConfig {
     pub min_damage: u64,
     pub max_damage: u64,
+    pub probability: f32,
     pub message: String,
 }
 
@@ -98,6 +99,7 @@ pub struct Trade {
 pub struct TradeConfig {
     pub min_gain: u64,
     pub max_gain: u64,
+    pub probability: f32,
     pub message: String,
 }
 
@@ -113,58 +115,60 @@ pub enum GameEvent {
 pub fn generate_random_event(config: &Config) -> GameEvent {
     let mut rng = rand::rng();
 
-    if rng.random_ratio(1, 20) {
-        match rng.random_range(0..4) {
-            0 => GameEvent::BanditRaid {
-                defense_loss: rng.random_range(
-                    config.events.bandit_raid.min_damage..=config.events.bandit_raid.max_damage,
-                ),
-                message: config.events.bandit_raid.message.clone(),
-            },
-            1 => GameEvent::SiegeCatapults {
-                defense_loss: rng.random_range(
-                    config.events.siege_catapults.min_damage
-                        ..=config.events.siege_catapults.max_damage,
-                ),
-                message: config.events.siege_catapults.message.clone(),
-            },
-            2 => GameEvent::Sabotage {
-                defense_loss: rng.random_range(
-                    config.events.sabotage.min_damage..=config.events.sabotage.max_damage,
-                ),
-                message: config.events.sabotage.message.clone(),
-            },
-            3 => GameEvent::TradeOffer {
-                gold_gain: rng
-                    .random_range(config.trade.offer.min_gain..=config.trade.offer.max_gain),
-                message: config.trade.offer.message.clone(),
-            },
-            _ => GameEvent::Nothing,
+    if rng.random_bool(config.events.bandit_raid.probability as f64) {
+        GameEvent::BanditRaid {
+            defense_loss: rng.random_range(
+                config.events.bandit_raid.min_damage..=config.events.bandit_raid.max_damage,
+            ),
+            message: config.events.bandit_raid.message.clone(),
+        }
+    } else if rng.random_bool(config.events.siege_catapults.probability as f64) {
+        GameEvent::SiegeCatapults {
+            defense_loss: rng.random_range(
+                config.events.siege_catapults.min_damage..=config.events.siege_catapults.max_damage,
+            ),
+            message: config.events.siege_catapults.message.clone(),
+        }
+    } else if rng.random_bool(config.events.sabotage.probability as f64) {
+        GameEvent::Sabotage {
+            defense_loss: rng.random_range(
+                config.events.sabotage.min_damage..=config.events.sabotage.max_damage,
+            ),
+            message: config.events.sabotage.message.clone(),
+        }
+    } else if rng.random_bool(config.trade.offer.probability as f64) {
+        GameEvent::TradeOffer {
+            gold_gain: rng.random_range(config.trade.offer.min_gain..=config.trade.offer.max_gain),
+            message: config.trade.offer.message.clone(),
         }
     } else {
         GameEvent::Nothing
     }
 }
 
-pub fn calculate_defense_per_second(upgrades: &components::Upgrades, config: &Config) -> u64 {
-    upgrades.0.iter().fold(0, |acc, upgrade| match upgrade {
-        components::AvailableUpgrades::Officer => acc + config.upgrades.officer.defense_per_second,
-        _ => acc,
-    })
+pub fn calculate_defense_per_second(
+    bought_upgrades: &components::BoughtUpgrades,
+    config: &Config,
+) -> u64 {
+    let level = bought_upgrades.get_count(&components::AvailableUpgrades::Officer);
+    if level == 0 {
+        return 0;
+    }
+
+    config.upgrades.officer.defense_per_second * level as u64
 }
 
-pub fn calculate_gold_per_second(upgrades: &components::Upgrades, config: &Config) -> u64 {
-    upgrades.0.iter().fold(0, |acc, upgrade| match upgrade {
-        components::AvailableUpgrades::TradeHall(level) => {
-            if *level == 0 {
-                return 0;
-            }
-            let level_index = (*level - 1) as usize;
-            let level = &config.trade_hall.levels[level_index];
-            acc + (config.trade_hall.base_gold_per_second as f32 * level.gold_multiplier) as u64
-        }
-        _ => acc,
-    })
+pub fn calculate_gold_per_second(
+    bought_upgrades: &components::BoughtUpgrades,
+    config: &Config,
+) -> u64 {
+    let level = bought_upgrades.get_count(&components::AvailableUpgrades::TradeHall);
+    if level == 0 {
+        return 0;
+    }
+    let level_index = (level - 1) as usize;
+    let level = &config.trade_hall.levels[level_index];
+    (config.trade_hall.base_gold_per_second as f32 * level.gold_multiplier) as u64
 }
 
 pub fn calculate_click_cooldown(midas_level: u32, config: &Config) -> f32 {
