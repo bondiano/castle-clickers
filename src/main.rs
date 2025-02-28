@@ -132,7 +132,7 @@ fn render_game(terminal: &mut Terminal<impl Backend>, world: &mut World) -> io::
     let entity = query.get_single(world).unwrap();
 
     terminal
-        .draw(|mut frame| {
+        .draw(|frame| {
             let (event_area, stats_area) = ui::create_layout(frame.area());
             let upgrades_area = Rect::new(
                 stats_area.x + stats_area.width,
@@ -159,26 +159,29 @@ fn render_game(terminal: &mut Terminal<impl Backend>, world: &mut World) -> io::
             let click_cooldown = game::calculate_click_cooldown(midas_level, config);
             let next_event_cooldown =
                 game::calculate_next_event_cooldown(last_event_check.0, config);
-            ui::stats::render_stats(
-                &mut frame,
-                stats_area,
+
+            let stats = ui::stats::StatsData {
                 gold,
                 gold_ps,
                 defense,
                 dps,
+            };
+            let timing = ui::stats::TimingData {
                 last_click,
                 click_cooldown,
                 next_event_cooldown,
-            );
+            };
+            ui::stats::render_stats(frame, stats_area, stats, timing);
+
             ui::upgrades::render_upgrades(
-                &mut frame,
+                frame,
                 upgrades_area,
                 upgrades,
                 selected,
                 bought_upgrades,
                 config,
             );
-            ui::events::render_event(&mut frame, event_area, event);
+            ui::events::render_event(frame, event_area, event);
         })
         .map(|_| ())
 }
@@ -188,9 +191,9 @@ fn render_game_over(terminal: &mut Terminal<impl Backend>, world: &mut World) ->
     let (defense, max_defense) = query.single_mut(world);
 
     terminal
-        .draw(|mut frame| {
+        .draw(|frame| {
             let area = ui::create_game_over_layout(frame.area());
-            ui::game_over::render_game_over(&mut frame, area, defense, max_defense);
+            ui::game_over::render_game_over(frame, area, defense, max_defense);
         })
         .map(|_| ())
 }

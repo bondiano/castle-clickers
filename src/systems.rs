@@ -142,6 +142,6 @@ pub fn handle_upgrade_system(
 
         gold.0 -= cost;
         bought_upgrades.increment(&selected.0);
-        upgrades.apply_defense(&mut defense, &config);
+        upgrades.apply_defense(&mut defense, config);
     }
 }

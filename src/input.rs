@@ -81,7 +81,6 @@ pub fn handle_game_over_input(world: &mut World) -> std::io::Result<()> {
                         *state_query.single_mut(world) = GameState::Exiting;
                     }
                     KeyCode::Enter => {
-                        // Reset the game state for a new game
                         reset_game(world);
                     }
                     _ => {}

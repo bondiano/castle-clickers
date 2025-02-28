@@ -64,14 +64,8 @@ impl AvailableUpgrades {
 #[derive(Component)]
 pub struct SelectedUpgrade(pub AvailableUpgrades);
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct BoughtUpgrades(pub HashMap<AvailableUpgrades, u32>);
-
-impl Default for BoughtUpgrades {
-    fn default() -> Self {
-        Self(HashMap::new())
-    }
-}
 
 impl BoughtUpgrades {
     pub fn get_count(&self, upgrade: &AvailableUpgrades) -> u32 {
